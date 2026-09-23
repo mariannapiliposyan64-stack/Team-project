@@ -20,6 +20,7 @@ public class TaskManager {
     public Task addTask(String title, String description, TaskPriority priority) {
         Task newTask = new Task(UUID.randomUUID().toString(), title, description, priority);
         tasks.add(newTask);
+        saveAll();
         return newTask;
     }
 
@@ -31,13 +32,18 @@ public class TaskManager {
             if (description != null) task.setDescription(description);
             if (priority != null) task.setPriority(priority);
             if (status != null) task.setStatus(status);
+            saveAll();
             return true;
         }
         return false;
     }
 
     public boolean deleteTask(String id) {
-        return tasks.removeIf(task -> task.getId().equals(id));
+        boolean removed = tasks.removeIf(task -> task.getId().equals(id));
+        if (removed) {
+            saveAll();
+        }
+        return removed;
     }
 
     public List<Task> getAllTasks() {
@@ -46,5 +52,34 @@ public class TaskManager {
 
     public Optional<Task> getTaskById(String id) {
         return tasks.stream().filter(task -> task.getId().equals(id)).findFirst();
+    }
+
+    public List<Task> searchTasks(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return getAllTasks();
+        }
+        String lowerQuery = query.toLowerCase().trim();
+        return tasks.stream()
+                .filter(task -> (task.getTitle() != null && task.getTitle().toLowerCase().contains(lowerQuery)) ||
+                                (task.getDescription() != null && task.getDescription().toLowerCase().contains(lowerQuery)))
+                .collect(Collectors.toList());
+    }
+
+    public List<Task> filterTasks(TaskStatus status, TaskPriority priority) {
+        return tasks.stream()
+                .filter(task -> (status == null || task.getStatus() == status))
+                .filter(task -> (priority == null || task.getPriority() == priority))
+                .collect(Collectors.toList());
+    }
+
+    public List<Task> searchAndFilterTasks(String query, TaskStatus status, TaskPriority priority) {
+        String lowerQuery = (query != null) ? query.toLowerCase().trim() : "";
+        return tasks.stream()
+                .filter(task -> lowerQuery.isEmpty() ||
+                        (task.getTitle() != null && task.getTitle().toLowerCase().contains(lowerQuery)) ||
+                        (task.getDescription() != null && task.getDescription().toLowerCase().contains(lowerQuery)))
+                .filter(task -> (status == null || task.getStatus() == status))
+                .filter(task -> (priority == null || task.getPriority() == priority))
+                .collect(Collectors.toList());
     }
 }

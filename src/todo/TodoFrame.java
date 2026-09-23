@@ -1,6 +1,8 @@
 package todo;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.format.DateTimeFormatter;
@@ -11,6 +13,7 @@ public class TodoFrame extends JFrame {
     private final DefaultTableModel tableModel;
     private final JTable taskTable;
 
+    // Input fields
     private final JTextField titleField;
     private final JTextArea descriptionArea;
     private final JComboBox<TaskPriority> priorityComboBox;
@@ -18,21 +21,19 @@ public class TodoFrame extends JFrame {
     private final JTextField creationDateField;
     private final JTextField idField;
 
+    // Search and Filter components
+    private final JTextField searchField;
+    private final JComboBox<String> filterStatusComboBox;
+    private final JComboBox<String> filterPriorityComboBox;
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public TodoFrame() {
         taskManager = new TaskManager();
 
         setTitle("To-Do List Application");
-        setSize(850, 600);
-        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent e) {
-                taskManager.saveAll();
-                System.exit(0);
-            }
-        });
+        setSize(950, 650);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         // Table Model
@@ -54,7 +55,46 @@ public class TodoFrame extends JFrame {
 
         JScrollPane tableScrollPane = new JScrollPane(taskTable);
 
-        // Input Form Panel
+        // --- Search & Filter Panel ---
+        JPanel searchFilterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        searchFilterPanel.setBorder(BorderFactory.createTitledBorder("Որոնում և Ֆիլտրում"));
+
+        searchFilterPanel.add(new JLabel("Որոնում:"));
+        searchField = new JTextField(15);
+        searchFilterPanel.add(searchField);
+
+        searchFilterPanel.add(new JLabel("Կարգավիճակ:"));
+        filterStatusComboBox = new JComboBox<>(new String[]{"Բոլորը", "OPEN", "IN_PROGRESS", "COMPLETED"});
+        searchFilterPanel.add(filterStatusComboBox);
+
+        searchFilterPanel.add(new JLabel("Առաջնահերթություն:"));
+        filterPriorityComboBox = new JComboBox<>(new String[]{"Բոլորը", "LOW", "MEDIUM", "HIGH"});
+        searchFilterPanel.add(filterPriorityComboBox);
+
+        JButton resetFiltersButton = new JButton("Մաքրել ֆիլտրերը");
+        searchFilterPanel.add(resetFiltersButton);
+
+        // Listeners for Search & Filter
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { refreshTable(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { refreshTable(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { refreshTable(); }
+        });
+
+        filterStatusComboBox.addActionListener(e -> refreshTable());
+        filterPriorityComboBox.addActionListener(e -> refreshTable());
+
+        resetFiltersButton.addActionListener(e -> {
+            searchField.setText("");
+            filterStatusComboBox.setSelectedIndex(0);
+            filterPriorityComboBox.setSelectedIndex(0);
+            refreshTable();
+        });
+
+        // --- Input Form Panel ---
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setBorder(BorderFactory.createTitledBorder("Առաջադրանքի տվյալներ"));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -129,12 +169,14 @@ public class TodoFrame extends JFrame {
         clearButton.addActionListener(e -> clearFields());
 
         // Top layout setup
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.add(formPanel, BorderLayout.CENTER);
-        topPanel.add(buttonPanel, BorderLayout.SOUTH);
+        JPanel topContainer = new JPanel();
+        topContainer.setLayout(new BoxLayout(topContainer, BoxLayout.Y_AXIS));
+        topContainer.add(searchFilterPanel);
+        topContainer.add(formPanel);
+        topContainer.add(buttonPanel);
 
         setLayout(new BorderLayout(10, 10));
-        add(topPanel, BorderLayout.NORTH);
+        add(topContainer, BorderLayout.NORTH);
         add(tableScrollPane, BorderLayout.CENTER);
 
         refreshTable();
@@ -220,7 +262,20 @@ public class TodoFrame extends JFrame {
 
     private void refreshTable() {
         tableModel.setRowCount(0);
-        List<Task> tasks = taskManager.getAllTasks();
+
+        String searchQuery = (searchField != null) ? searchField.getText().trim() : "";
+        
+        TaskStatus statusFilter = null;
+        if (filterStatusComboBox != null && filterStatusComboBox.getSelectedIndex() > 0) {
+            statusFilter = TaskStatus.valueOf((String) filterStatusComboBox.getSelectedItem());
+        }
+
+        TaskPriority priorityFilter = null;
+        if (filterPriorityComboBox != null && filterPriorityComboBox.getSelectedIndex() > 0) {
+            priorityFilter = TaskPriority.valueOf((String) filterPriorityComboBox.getSelectedItem());
+        }
+
+        List<Task> tasks = taskManager.searchAndFilterTasks(searchQuery, statusFilter, priorityFilter);
         for (Task task : tasks) {
             String formattedDate = task.getCreationDate() != null ? task.getCreationDate().format(DATE_FORMATTER) : "";
             tableModel.addRow(new Object[]{
