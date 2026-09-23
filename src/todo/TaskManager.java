@@ -10,7 +10,11 @@ public class TaskManager {
     private List<Task> tasks;
 
     public TaskManager() {
-        this.tasks = new ArrayList<>();
+        this.tasks = FileManager.loadTasks();
+    }
+    
+    public void saveAll() {
+        FileManager.saveTasks(this.tasks);
     }
 
     public Task addTask(String title, String description, TaskPriority priority) {
